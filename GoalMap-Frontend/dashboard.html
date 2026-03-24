@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoalPath — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #13131a; --surface2: #1a1a24;
+    --border: #1e1e2e; --border2: #2a2a3e; --accent: #7c6af7;
+    --accent-dim: rgba(124,106,247,0.15); --text: #e8e8f0; --muted: #6b6b80;
+    --success: #4ade80; --success-dim: rgba(74,222,128,0.1); --danger: #f87171;
+  }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; }
+  nav {
+    background:var(--surface); border-bottom:1px solid var(--border);
+    padding:0 32px; height:60px; display:flex; align-items:center;
+    justify-content:space-between; position:sticky; top:0; z-index:100;
+  }
+  .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:18px; display:flex; align-items:center; gap:8px; }
+  .logo-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); }
+  .nav-right { display:flex; align-items:center; gap:16px; }
+  .user-badge { font-size:13px; color:var(--muted); background:var(--surface2); border:1px solid var(--border); padding:6px 14px; border-radius:20px; }
+  .logout-btn { font-size:13px; color:var(--muted); background:none; border:1px solid var(--border); padding:6px 14px; border-radius:20px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:color 0.2s,border-color 0.2s; }
+  .logout-btn:hover { color:var(--danger); border-color:var(--danger); }
+  .container { max-width:900px; margin:0 auto; padding:40px 24px; }
+  .section-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; margin-bottom:16px; letter-spacing:-0.3px; }
+  .goal-form { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px; margin-bottom:32px; }
+  .goal-form textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px 16px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; outline:none; resize:none; height:80px; transition:border-color 0.2s; margin-bottom:12px; }
+  .goal-form textarea:focus { border-color:var(--accent); }
+  .goal-form textarea::placeholder { color:var(--muted); }
+  .form-row { display:flex; gap:12px; align-items:center; }
+  .form-row select { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px 14px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; outline:none; flex-shrink:0; }
+  .form-row select option { background:var(--surface); }
+  .btn { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:10px 22px; font-family:'Syne',sans-serif; font-size:14px; font-weight:600; cursor:pointer; transition:opacity 0.2s,transform 0.1s; white-space:nowrap; }
+  .btn:hover { opacity:0.9; }
+  .btn:active { transform:scale(0.97); }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .btn-outline { background:transparent; border:1px solid var(--border2); color:var(--text); border-radius:10px; padding:8px 18px; font-family:'Syne',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:border-color 0.2s,color 0.2s; }
+  .btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-outline:disabled { opacity:0.4; cursor:not-allowed; }
+  .goals-list { display:flex; flex-direction:column; gap:12px; margin-bottom:32px; }
+  .goal-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; cursor:pointer; transition:border-color 0.2s,background 0.2s; }
+  .goal-card:hover { border-color:var(--border2); }
+  .goal-card.active { border-color:var(--accent); background:var(--accent-dim); }
+  .goal-card-left { flex:1; }
+  .goal-num { font-size:11px; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .goal-desc { font-size:15px; font-weight:500; margin-bottom:4px; line-height:1.4; }
+  .goal-meta { font-size:12px; color:var(--muted); }
+  .status-badge { font-size:11px; font-weight:600; padding:4px 10px; border-radius:20px; text-transform:uppercase; letter-spacing:0.5px; flex-shrink:0; }
+  .status-ACTIVE { background:var(--accent-dim); color:var(--accent); }
+  .status-COMPLETED { background:var(--success-dim); color:var(--success); }
+  .roadmap-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px; }
+  .progress-wrap { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 24px; margin-bottom:20px; }
+  .progress-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .progress-label { font-size:14px; color:var(--muted); }
+  .progress-pct { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; color:var(--accent); }
+  .progress-bar-bg { height:6px; background:var(--border); border-radius:99px; overflow:hidden; }
+  .progress-bar-fill { height:100%; background:var(--accent); border-radius:99px; transition:width 0.6s ease; }
+  .task-list { display:flex; flex-direction:column; gap:10px; }
+  .task-item { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 20px; display:flex; align-items:flex-start; gap:14px; transition:border-color 0.2s; animation:fadeIn 0.3s ease forwards; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .task-item.done { opacity:0.6; }
+  .task-check { width:22px; height:22px; border-radius:50%; border:2px solid var(--border2); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color 0.2s,background 0.2s; margin-top:1px; }
+  .task-check:hover { border-color:var(--accent); }
+  .task-check.checked { background:var(--success); border-color:var(--success); }
+  .task-check.checked::after { content:'✓'; color:#000; font-size:12px; font-weight:700; }
+  .task-body { flex:1; }
+  .task-num { font-size:11px; color:var(--muted); margin-bottom:3px; font-weight:500; }
+  .task-desc { font-size:15px; font-weight:500; line-height:1.4; margin-bottom:6px; }
+  .task-desc.done-text { text-decoration:line-through; color:var(--muted); }
+  .task-skill { display:inline-block; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); padding:3px 10px; border-radius:20px; }
+  .empty-state { text-align:center; padding:48px 24px; color:var(--muted); }
+  .empty-state p { font-size:15px; margin-top:8px; }
+  .spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 16px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .loading-text { font-size:14px; color:var(--muted); text-align:center; padding:40px; }
+  .toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border2); border-radius:12px; padding:14px 20px; font-size:14px; color:var(--text); z-index:999; transform:translateY(80px); opacity:0; transition:transform 0.3s ease,opacity 0.3s ease; max-width:320px; }
+  .toast.show { transform:translateY(0); opacity:1; }
+  .toast.success { border-color:rgba(74,222,128,0.4); color:var(--success); }
+  .toast.error { border-color:rgba(248,113,113,0.4); color:var(--danger); }
+  .divider { height:1px; background:var(--border); margin:32px 0; }
+  .section-actions { display:flex; gap:10px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo"><span class="logo-dot"></span> GoalPath</div>
+  <div class="nav-right">
+    <span class="user-badge" id="userName">Loading...</span>
+    <button class="logout-btn" onclick="logout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="goal-form">
+    <p class="section-title">New goal</p>
+    <textarea id="goalDesc" placeholder="What do you want to achieve? e.g. Become a backend developer at a product company in 12 months"></textarea>
+    <div class="form-row">
+      <select id="duration">
+        <option value="3">3 months</option>
+        <option value="6">6 months</option>
+        <option value="12" selected>12 months</option>
+        <option value="18">18 months</option>
+        <option value="24">24 months</option>
+      </select>
+      <button class="btn" onclick="createGoal()">Create goal</button>
+    </div>
+  </div>
+
+  <div id="goalsSection">
+    <p class="section-title">Your goals</p>
+    <div class="goals-list" id="goalsList">
+      <div class="loading-text"><div class="spinner"></div>Loading goals...</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div id="roadmapSection" style="display:none">
+    <div class="roadmap-header">
+      <p class="section-title" id="roadmapTitle">Roadmap</p>
+      <div class="section-actions">
+        <button class="btn-outline" id="recalcBtn" onclick="recalculate()">Recalculate</button>
+        <button class="btn" id="generateBtn" onclick="generateRoadmap()">Generate roadmap</button>
+      </div>
+    </div>
+
+    <div id="progressWrap" style="display:none">
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span class="progress-label" id="progressLabel">0 of 0 tasks complete</span>
+          <span class="progress-pct" id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="task-list" id="taskList">
+      <div class="empty-state"><p>No roadmap yet — click Generate roadmap to create one with AI</p></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://localhost:8080';
+const token = localStorage.getItem('token');
+const userId = localStorage.getItem('userId');
+let activeGoalId = null;
+let activeRoadmapId = null;
+
+if (!token) window.location.href = 'login.html';
+document.getElementById('userName').textContent = localStorage.getItem('userName') || 'User';
+
+function headers() {
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
+
+function showToast(msg, type) {
+  type = type || 'success';
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(function() { t.className = 'toast'; }, 3000);
+}
+
+function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
+async function loadGoals() {
+  try {
+    const res = await fetch(API + '/api/goals?userId=' + userId, { headers: headers() });
+    const goals = await res.json();
+    renderGoals(goals);
+  } catch(err) {
+    document.getElementById('goalsList').innerHTML = '<div class="empty-state"><p>Could not load goals</p></div>';
+  }
+}
+
+function renderGoals(goals) {
+  const list = document.getElementById('goalsList');
+  if (!goals.length) {
+    list.innerHTML = '<div class="empty-state"><p>No goals yet — create your first one above</p></div>';
+    return;
+  }
+  list.innerHTML = goals.map(function(g, i) {
+    return '<div class="goal-card ' + (activeGoalId == g.id ? 'active' : '') + '" onclick="selectGoal(' + g.id + ', \'' + g.goalDescription.replace(/'/g, "\\'") + '\')">' +
+      '<div class="goal-card-left">' +
+        '<div class="goal-num">Goal ' + (g.userGoalNumber || i + 1) + '</div>' +
+        '<div class="goal-desc">' + g.goalDescription + '</div>' +
+        '<div class="goal-meta">' + g.targetDurationMonths + ' months</div>' +
+      '</div>' +
+      '<span class="status-badge status-' + g.status + '">' + g.status + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+async function createGoal() {
+  const desc = document.getElementById('goalDesc').value.trim();
+  if (!desc) { showToast('Please enter a goal description', 'error'); return; }
+  try {
+    const res = await fetch(API + '/api/goals', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ userId: parseInt(userId), goalDescription: desc, targetDurationMonths: parseInt(document.getElementById('duration').value) })
+    });
+    if (!res.ok) throw new Error('Failed to create goal');
+    const goal = await res.json();
+    document.getElementById('goalDesc').value = '';
+    showToast('Goal created!');
+    await loadGoals();
+    selectGoal(goal.id, goal.goalDescription);
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+async function selectGoal(goalId, desc) {
+  activeGoalId = goalId;
+  document.getElementById('roadmapSection').style.display = 'block';
+  document.getElementById('roadmapTitle').textContent = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+  document.querySelectorAll('.goal-card').forEach(function(c) { c.classList.remove('active'); });
+  var cards = document.querySelectorAll('.goal-card');
+  cards.forEach(function(c) { if (c.onclick && c.onclick.toString().includes(goalId)) c.classList.add('active'); });
+  await loadRoadmapForGoal(goalId);
+  loadGoals();
+}
+
+async function loadRoadmapForGoal(goalId) {
+  try {
+    const res = await fetch(API + '/api/roadmaps?userId=' + userId, { headers: headers() });
+    const roadmaps = await res.json();
+    const roadmap = roadmaps.find(function(r) { return r.goalId == goalId; });
+    if (roadmap) {
+      activeRoadmapId = roadmap.id;
+      renderRoadmap(roadmap);
+    } else {
+      activeRoadmapId = null;
+      document.getElementById('progressWrap').style.display = 'none';
+      document.getElementById('taskList').innerHTML = '<div class="empty-state"><p>No roadmap yet — click Generate roadmap to create one with AI</p></div>';
+    }
+  } catch(err) { showToast('Could not load roadmap', 'error'); }
+}
+
+async function generateRoadmap() {
+  if (!activeGoalId) { showToast('Select a goal first', 'error'); return; }
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  document.getElementById('taskList').innerHTML = '<div class="loading-text"><div class="spinner"></div>AI is building your roadmap — this takes 30-60 seconds...</div>';
+  try {
+    const res = await fetch(API + '/api/roadmaps/generate', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ userId: parseInt(userId), goalId: activeGoalId })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Generation failed'); }
+    const roadmap = await res.json();
+    activeRoadmapId = roadmap.id;
+    renderRoadmap(roadmap);
+    showToast('Roadmap generated!');
+  } catch(err) {
+    showToast(err.message, 'error');
+    document.getElementById('taskList').innerHTML = '<div class="empty-state"><p>Generation failed — make sure Ollama is running</p></div>';
+  } finally { btn.disabled = false; btn.textContent = 'Generate roadmap'; }
+}
+
+function renderRoadmap(roadmap) {
+  const total = roadmap.totalTasks;
+  const done = roadmap.completedTasks;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressLabel').textContent = done + ' of ' + total + ' tasks complete';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressFill').style.width = pct + '%';
+  if (!roadmap.tasks || !roadmap.tasks.length) {
+    document.getElementById('taskList').innerHTML = '<div class="empty-state"><p>No tasks in this roadmap</p></div>';
+    return;
+  }
+  document.getElementById('taskList').innerHTML = roadmap.tasks.map(function(task, i) {
+    return '<div class="task-item ' + (task.completed ? 'done' : '') + '" id="task-' + task.id + '" style="animation-delay:' + (i * 40) + 'ms">' +
+      '<div class="task-check ' + (task.completed ? 'checked' : '') + '" onclick="toggleTask(' + task.id + ', ' + !task.completed + ')"></div>' +
+      '<div class="task-body">' +
+        '<div class="task-num">Step ' + task.priority + '</div>' +
+        '<div class="task-desc ' + (task.completed ? 'done-text' : '') + '">' + task.description + '</div>' +
+        (task.skillName ? '<span class="task-skill">' + task.skillName + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function toggleTask(taskId, completed) {
+  try {
+    const res = await fetch(API + '/api/tasks/' + taskId + '/complete', {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify({ completed: completed })
+    });
+    if (!res.ok) throw new Error('Failed to update task');
+    const roadmapRes = await fetch(API + '/api/roadmaps/' + activeRoadmapId, { headers: headers() });
+    const roadmap = await roadmapRes.json();
+    renderRoadmap(roadmap);
+    showToast(completed ? 'Task completed!' : 'Task unchecked');
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+async function recalculate() {
+  if (!activeRoadmapId) { showToast('Generate a roadmap first', 'error'); return; }
+  const btn = document.getElementById('recalcBtn');
+  btn.disabled = true; btn.textContent = 'Recalculating...';
+  try {
+    const res = await fetch(API + '/api/roadmaps/' + activeRoadmapId + '/recalculate', {
+      method: 'POST', headers: headers()
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed'); }
+    await loadRoadmapForGoal(activeGoalId);
+    showToast('Roadmap updated with new steps!');
+  } catch(err) { showToast(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Recalculate'; }
+}
+
+loadGoals();
+</script>
+</body>
+</html>
