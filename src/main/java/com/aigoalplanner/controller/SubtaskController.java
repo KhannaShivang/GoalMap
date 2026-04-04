@@ -2,7 +2,6 @@ package com.aigoalplanner.controller;
 
 import com.aigoalplanner.dto.SubtaskDTO;
 import com.aigoalplanner.service.SubtaskService;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

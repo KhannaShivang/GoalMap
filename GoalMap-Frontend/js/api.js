@@ -4,8 +4,8 @@ const API_BASE = 'http://localhost:8080/api';
 // Storage helpers
 // ============================================================
 
-function getToken()  { return localStorage.getItem('token'); }
-function getUserId() { return localStorage.getItem('userId'); }
+function getToken()    { return localStorage.getItem('token'); }
+function getUserId()   { return localStorage.getItem('userId'); }
 function getUserName() { return localStorage.getItem('userName'); }
 
 function saveSession(data) {
@@ -16,31 +16,24 @@ function saveSession(data) {
 }
 
 function clearSession() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('userId');
-  localStorage.removeItem('userName');
-  localStorage.removeItem('email');
+  ['token','userId','userName','email'].forEach(k => localStorage.removeItem(k));
 }
 
 function isLoggedIn() { return !!getToken(); }
 
 // ============================================================
-// Core fetch wrapper — adds token automatically
+// Core fetch wrapper
 // ============================================================
 
 async function apiFetch(path, options = {}) {
   const token = getToken();
-
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
   if (response.status === 401) {
     clearSession();
@@ -49,11 +42,7 @@ async function apiFetch(path, options = {}) {
   }
 
   const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong');
-  }
-
+  if (!response.ok) throw new Error(data.message || 'Something went wrong');
   return data;
 }
 
@@ -71,9 +60,9 @@ const Auth = {
 // ============================================================
 
 const Goals = {
-  create:     (body)   => apiFetch('/goals',              { method: 'POST', body: JSON.stringify(body) }),
-  getByUser:  (userId) => apiFetch(`/goals?userId=${userId}`),
-  getById:    (id)     => apiFetch(`/goals/${id}`),
+  create:    (body)   => apiFetch('/goals', { method: 'POST', body: JSON.stringify(body) }),
+  getByUser: (userId) => apiFetch(`/goals?userId=${userId}`),
+  getById:   (id)     => apiFetch(`/goals/${id}`),
 };
 
 // ============================================================
@@ -81,12 +70,12 @@ const Goals = {
 // ============================================================
 
 const Roadmaps = {
-  generate:   (userId, goalId) => apiFetch('/roadmaps/generate', {
+  generate:  (userId, goalId) => apiFetch('/roadmaps/generate', {
     method: 'POST',
     body: JSON.stringify({ userId, goalId }),
   }),
-  getByUser:  (userId) => apiFetch(`/roadmaps?userId=${userId}`),
-  getById:    (id)     => apiFetch(`/roadmaps/${id}`),
+  getByUser: (userId) => apiFetch(`/roadmaps?userId=${userId}`),
+  getById:   (id)     => apiFetch(`/roadmaps/${id}`),
 };
 
 // ============================================================
@@ -94,12 +83,48 @@ const Roadmaps = {
 // ============================================================
 
 const Progress = {
-  getProgress:   (roadmapId) => apiFetch(`/roadmaps/${roadmapId}/progress`),
-  completeTask:  (taskId, completed) => apiFetch(`/tasks/${taskId}/complete`, {
+  getProgress:  (roadmapId) => apiFetch(`/roadmaps/${roadmapId}/progress`),
+  completeTask: (taskId, completed) => apiFetch(`/tasks/${taskId}/complete`, {
     method: 'PUT',
     body: JSON.stringify({ completed }),
   }),
-  recalculate:   (roadmapId) => apiFetch(`/roadmaps/${roadmapId}/recalculate`, { method: 'POST' }),
+  recalculate:  (roadmapId) => apiFetch(`/roadmaps/${roadmapId}/recalculate`, {
+    method: 'POST',
+  }),
+};
+
+// ============================================================
+// Subtasks
+// ============================================================
+
+const Subtasks = {
+  getOrGenerate: (taskId) => apiFetch(`/tasks/${taskId}/subtasks`),
+  complete: (subtaskId, completed) => apiFetch(`/subtasks/${subtaskId}/complete`, {
+    method: 'PUT',
+    body: JSON.stringify({ completed }),
+  }),
+  status: (taskId) => apiFetch(`/tasks/${taskId}/subtasks/status`),
+};
+
+// ============================================================
+// Quizzes
+// ============================================================
+
+const Quizzes = {
+  /**
+   * Get a fresh quiz (always generates new one via AI)
+   * @param {number} taskId
+   * @param {boolean} useRetake - If true, fetches last quiz for re-practice
+   */
+  get:    (taskId, useRetake = false) => apiFetch(
+    useRetake
+      ? `/tasks/${taskId}/quiz/retake`
+      : `/tasks/${taskId}/quiz`
+  ),
+  submit: (taskId, answers) => apiFetch(`/tasks/${taskId}/quiz/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ answers }),
+  }),
 };
 
 // ============================================================

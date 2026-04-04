@@ -28,13 +28,19 @@ spring:
       mode: never
 
   ai:
-    ollama:
-      base-url: http://localhost:11434
+    # ---- Groq for CHAT (fast, free) ----
+    openai:
+      api-key: ${GROQ_API_KEY}
+      base-url: https://api.groq.com/openai
       chat:
         options:
-          model: llama3.2
+          model: llama-3.1-8b-instant   # free, 2-3s response
           temperature: 0.7
-          num-predict: 2048
+          max-tokens: 2048
+
+    # ---- Ollama for EMBEDDINGS only (Groq doesn't support embeddings yet) ----
+    ollama:
+      base-url: http://localhost:11434
       embedding:
         options:
           model: nomic-embed-text
@@ -48,7 +54,7 @@ spring:
 
 jwt:
   secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-  expiration-ms: 86400000   # 24 hours
+  expiration-ms: 86400000
 
 logging:
   level:

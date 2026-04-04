@@ -148,20 +148,46 @@ public class AIRecommendationService {
             new BeanOutputConverter<>(new ParameterizedTypeReference<List<AIQuizItem>>() {});
 
         String prompt = """
-                You are an expert programming teacher creating a quiz.
+                You are an expert programming teacher creating a high-quality quiz.
 
                 TOPIC: %s
                 SKILL: %s
 
-                Create exactly 5 multiple choice questions to test understanding of this topic.
+                Create 8 to 15 multiple choice questions appropriate for the topic complexity.
+                - Simple/fundamental topics: 8-10 questions
+                - Moderate topics: 10-12 questions
+                - Complex/advanced topics: 12-15 questions
 
-                Rules:
-                - Each question must have exactly 4 options: optionA, optionB, optionC, optionD
-                - correctAnswer must be exactly one of: "A", "B", "C", or "D"
-                - explanation should clearly explain why the correct answer is right
-                - Questions should test real understanding, not just memorization
-                - Vary difficulty from easy to medium to hard
-                - Each question must have an "order" number starting at 1
+                STRUCTURE REQUIREMENTS:
+                - The "question" field must contain ONLY the question text itself
+                - DO NOT include options (A/B/C/D) as part of the question text
+                - Each option (optionA, optionB, optionC, optionD) must be a separate field
+                - Options should be plausible — avoid obviously wrong answers
+
+                QUESTION QUALITY RULES:
+                - First 30%%: Easy — test basic concepts and definitions
+                - Middle 40%%: Medium — test application and understanding
+                - Last 30%%: Hard — test edge cases, debugging, or complex scenarios
+                - Use real-world scenarios and code snippets where relevant
+                - Include common misconceptions as distractor options
+                - Each explanation must teach something — explain WHY the answer is correct
+
+                OUTPUT FORMAT:
+                - correctAnswer must be exactly one of: "A", "B", "C", or "D" (uppercase)
+                - explanation should be 1-3 sentences explaining the reasoning
+                - order must be a number starting at 1
+
+                EXAMPLE OF GOOD QUESTION FORMAT:
+                {
+                  "order": 1,
+                  "question": "What is the time complexity of binary search?",
+                  "optionA": "O(n)",
+                  "optionB": "O(log n)",
+                  "optionC": "O(n log n)",
+                  "optionD": "O(1)",
+                  "correctAnswer": "B",
+                  "explanation": "Binary search divides the search space in half each iteration, giving O(log n) complexity."
+                }
 
                 %s
                 """.formatted(taskDescription, skillName != null ? skillName : "",
@@ -171,6 +197,9 @@ public class AIRecommendationService {
         try {
             String raw = chatClient.prompt().user(prompt).call().content();
             List<AIQuizItem> items = converter.convert(raw);
+            if (items == null || items.isEmpty()) {
+                throw new AIServiceException("AI returned empty quiz", null);
+            }
             log.info("Generated {} quiz questions for: {}", items.size(), taskDescription);
             return items;
         } catch (Exception e) {
