@@ -16,8 +16,7 @@ public class TaskDTO {
     private LocalDateTime completedAt;
     private String skillName;
     private List<ResourceDTO> resources;
-
-    // Subtask summary — populated when fetching roadmap
+    private Long skillId;
     private Integer totalSubtasks;
     private Integer completedSubtasks;
     private Boolean hasSubtasks;

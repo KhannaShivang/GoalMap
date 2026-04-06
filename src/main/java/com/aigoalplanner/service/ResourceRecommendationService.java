@@ -1,8 +1,10 @@
 package com.aigoalplanner.service;
 
+import com.aigoalplanner.dto.AIResourceItem;
 import com.aigoalplanner.dto.ResourceDTO;
 import com.aigoalplanner.exception.GlobalExceptionHandler.ResourceNotFoundException;
 import com.aigoalplanner.model.Resource;
+import com.aigoalplanner.model.Skill;
 import com.aigoalplanner.repository.ResourceRepository;
 import com.aigoalplanner.repository.SkillRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,60 +25,88 @@ public class ResourceRecommendationService {
     private final ResourceRepository resourceRepository;
     private final SkillRepository skillRepository;
     private final EmbeddingModel embeddingModel;
-    @Transactional(readOnly = true)
+    private final AIRecommendationService aiService;
+
+    // --------------------------------------------------------
+    // Get resources for a skill.
+    // If none exist in DB → ask AI to generate them → save → return.
+    // --------------------------------------------------------
+
+    @Transactional
     public List<ResourceDTO> getResourcesForSkill(Long skillId, int limit) {
-        skillRepository.findById(skillId)
+        Skill skill = skillRepository.findById(skillId)
             .orElseThrow(() -> new ResourceNotFoundException("Skill not found: " + skillId));
 
-        List<Resource> resources = resourceRepository.findBySkillId(skillId);
-        if (resources.isEmpty()) {
-            log.debug("No resources found for skillId={}", skillId);
-            return List.of();
+        List<Resource> existing = resourceRepository.findBySkillId(skillId);
+
+        if (!existing.isEmpty()) {
+            log.debug("Returning {} existing resources for skill={}", existing.size(), skill.getName());
+            return existing.stream().limit(limit).map(this::toDTO).toList();
         }
-        return resources.stream().limit(limit).map(this::toDTO).toList();
+
+        // No resources yet — generate via AI
+        log.info("No resources for skill='{}' — generating via AI", skill.getName());
+        List<AIResourceItem> aiItems = aiService.generateResources(skill.getName());
+
+        List<Resource> saved = aiItems.stream().map(item -> {
+            Resource.ResourceType type = parseType(item.getType());
+            Resource.Difficulty diff   = parseDifficulty(item.getDifficulty());
+
+            Resource resource = Resource.builder()
+                    .title(item.getTitle())
+                    .link(item.getUrl())
+                    .type(type)
+                    .skill(skill)
+                    .difficulty(diff)
+                    .build();
+            return resourceRepository.save(resource);
+        }).toList();
+
+        log.info("Saved {} AI-generated resources for skill='{}'", saved.size(), skill.getName());
+
+        // Embed in background — don't block the response
+        embedResourcesAsync(saved);
+
+        return saved.stream().limit(limit).map(this::toDTO).toList();
     }
 
     // --------------------------------------------------------
-    // Vector similarity search — returns empty list on any failure
+    // Vector similarity search — returns empty on failure, never crashes
     // --------------------------------------------------------
 
     @Transactional(readOnly = true)
     public List<ResourceDTO> findSimilarResources(String query, int limit) {
-        log.debug("Running similarity search for query: {}", query);
+        log.debug("Similarity search: '{}'", query);
         try {
-            float[] queryEmbedding   = embed(query);
-            String pgVectorLiteral   = toPgVectorLiteral(queryEmbedding);
-            List<Resource> results   = resourceRepository
-                .findSimilarResources(pgVectorLiteral, limit);
-            log.info("Similarity search returned {} resources", results.size());
+            float[] embedding      = embed(query);
+            String pgVector        = toPgVectorLiteral(embedding);
+            List<Resource> results = resourceRepository.findSimilarResources(pgVector, limit);
+            log.info("Similarity search returned {} results", results.size());
             return results.stream().map(this::toDTO).toList();
         } catch (Exception e) {
-            log.warn("Similarity search failed for query '{}': {} — returning empty list",
-                query, e.getMessage());
+            log.warn("Similarity search failed: {} — returning empty list", e.getMessage());
             return List.of();
         }
     }
 
     @Transactional(readOnly = true)
-    public List<ResourceDTO> findSimilarResourcesForSkill(
-            Long skillId, String query, int limit) {
+    public List<ResourceDTO> findSimilarResourcesForSkill(Long skillId, String query, int limit) {
         skillRepository.findById(skillId)
             .orElseThrow(() -> new ResourceNotFoundException("Skill not found: " + skillId));
         try {
-            float[] queryEmbedding = embed(query);
-            String pgVectorLiteral = toPgVectorLiteral(queryEmbedding);
+            float[] embedding      = embed(query);
+            String pgVector        = toPgVectorLiteral(embedding);
             return resourceRepository
-                .findSimilarResourcesBySkill(skillId, pgVectorLiteral, limit)
+                .findSimilarResourcesBySkill(skillId, pgVector, limit)
                 .stream().map(this::toDTO).toList();
         } catch (Exception e) {
-            log.warn("Similarity search failed for skillId={}: {} — returning empty list",
-                skillId, e.getMessage());
+            log.warn("Skill similarity search failed: {} — returning empty list", e.getMessage());
             return List.of();
         }
     }
 
     // --------------------------------------------------------
-    // Embed all resources that have no embedding yet
+    // Embed all resources without embeddings
     // --------------------------------------------------------
 
     @Transactional
@@ -94,8 +124,7 @@ public class ResourceRecommendationService {
                 resourceRepository.save(resource);
                 count++;
             } catch (Exception e) {
-                log.error("Failed to embed resource id={}: {}",
-                    resource.getId(), e.getMessage());
+                log.error("Failed to embed resource id={}: {}", resource.getId(), e.getMessage());
             }
         }
         log.info("Embedded {} resources", count);
@@ -105,6 +134,24 @@ public class ResourceRecommendationService {
     // --------------------------------------------------------
     // Helpers
     // --------------------------------------------------------
+
+    private void embedResourcesAsync(List<Resource> resources) {
+        // Embed in a separate thread so the API response isn't delayed
+        new Thread(() -> {
+            for (Resource r : resources) {
+                try {
+                    String text = r.getTitle() + " "
+                        + (r.getSkill() != null ? r.getSkill().getName() : "")
+                        + " " + r.getType().name() + " " + r.getDifficulty().name();
+                    r.setEmbedding(embed(text));
+                    resourceRepository.save(r);
+                } catch (Exception e) {
+                    log.warn("Background embed failed for id={}: {}", r.getId(), e.getMessage());
+                }
+            }
+            log.info("Background embedding complete for {} resources", resources.size());
+        }, "resource-embedder").start();
+    }
 
     private float[] embed(String text) {
         return embeddingModel.embed(text);
@@ -119,7 +166,19 @@ public class ResourceRecommendationService {
         return sb.append("]").toString();
     }
 
-    private ResourceDTO toDTO(Resource r) {
+    private Resource.ResourceType parseType(String type) {
+        if (type == null) return Resource.ResourceType.ARTICLE;
+        try { return Resource.ResourceType.valueOf(type.toUpperCase()); }
+        catch (Exception e) { return Resource.ResourceType.ARTICLE; }
+    }
+
+    private Resource.Difficulty parseDifficulty(String diff) {
+        if (diff == null) return Resource.Difficulty.BEGINNER;
+        try { return Resource.Difficulty.valueOf(diff.toUpperCase()); }
+        catch (Exception e) { return Resource.Difficulty.BEGINNER; }
+    }
+
+    public ResourceDTO toDTO(Resource r) {
         return ResourceDTO.builder()
                 .id(r.getId())
                 .title(r.getTitle())

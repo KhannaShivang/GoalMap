@@ -3,6 +3,7 @@ package com.aigoalplanner.service;
 import com.aigoalplanner.dto.AITaskItem;
 import com.aigoalplanner.dto.AISubtaskItem;
 import com.aigoalplanner.dto.AIQuizItem;
+import com.aigoalplanner.dto.AIResourceItem;
 import com.aigoalplanner.exception.GlobalExceptionHandler.AIServiceException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -204,6 +205,45 @@ public class AIRecommendationService {
             return items;
         } catch (Exception e) {
             throw new AIServiceException("Quiz generation failed: " + e.getMessage(), e);
+        }
+    }
+        // ============================================================
+    // Generate learning resources for a skill (on demand)
+    // ============================================================
+
+    public List<AIResourceItem> generateResources(String skillName) {
+        BeanOutputConverter<List<AIResourceItem>> converter =
+            new BeanOutputConverter<>(new ParameterizedTypeReference<List<AIResourceItem>>() {});
+
+        String prompt = """
+                You are an expert learning resource curator.
+
+                SKILL: %s
+
+                Suggest exactly 6 high quality learning resources for this skill.
+                Include a mix of: official documentation, free courses, articles, YouTube channels, and practice projects.
+
+                Rules:
+                - title: name of the resource (short, clear)
+                - url: real, working URL — use well known sites like docs.spring.io, baeldung.com,
+                  youtube.com, github.com, javaguides.net, geeksforgeeks.org, tutorialspoint.com etc.
+                - type: exactly one of ARTICLE, COURSE, VIDEO, DOCUMENTATION, PROJECT
+                - difficulty: exactly one of BEGINNER, INTERMEDIATE, ADVANCED
+                - description: one sentence about what the learner will get from this resource
+
+                %s
+                """.formatted(skillName, converter.getFormat());
+
+        log.debug("Generating resources for skill: {}", skillName);
+        try {
+            String raw = chatClient.prompt().user(prompt).call().content();
+            List<AIResourceItem> items = converter.convert(raw);
+            log.info("Generated {} resources for skill: {}", items.size(), skillName);
+            return items;
+        } catch (Exception e) {
+            log.warn("Resource generation failed for skill '{}': {} — returning empty list",
+                skillName, e.getMessage());
+            return List.of();
         }
     }
 }

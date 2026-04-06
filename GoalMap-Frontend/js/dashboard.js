@@ -136,11 +136,13 @@ function renderRoadmap(roadmap) {
 }
 
 function renderTaskCard(task) {
-  const isChecked = task.completed;
-  return `
+    const isChecked = task.completed;
+    const skillId   = task.skillId || '';   // need skillId in TaskDTO
+    const skillName = task.skillName || '';
+
+    return `
     <div class="task-card ${isChecked ? 'completed' : ''}" id="taskCard_${task.id}">
 
-      <!-- Task header -->
       <div class="task-header" onclick="toggleTaskExpand(${task.id})">
         <div class="task-checkbox ${isChecked ? 'checked' : ''}"
              onclick="event.stopPropagation(); toggleTask(${task.id}, ${!isChecked})">
@@ -150,13 +152,17 @@ function renderTaskCard(task) {
           <div class="task-priority">Step ${task.priority}</div>
           <div class="task-description">${task.description}</div>
           <div class="task-footer">
-            ${task.skillName ? `<span class="task-skill">${task.skillName}</span>` : ''}
+            ${skillName ? `<span class="task-skill">${skillName}</span>` : ''}
+            ${skillName ? `
+              <button class="btn btn-ghost btn-sm"
+                onclick="event.stopPropagation(); showResources(${task.id}, '${skillName.replace(/'/g,"\\'")}', ${skillId || 'null'})">
+                Resources
+              </button>` : ''}
           </div>
         </div>
         <div class="task-expand-btn" id="expandBtn_${task.id}">▶</div>
       </div>
 
-      <!-- Expandable subtask + quiz section -->
       <div class="task-detail hidden" id="taskDetail_${task.id}">
         <div class="subtask-section">
           <div class="subtask-header">
@@ -171,7 +177,7 @@ function renderTaskCard(task) {
         <div class="quiz-section" id="quizSection_${task.id}">
           <button class="btn btn-outline btn-full quiz-btn"
                   id="quizBtn_${task.id}"
-                  onclick="openQuiz(${task.id}, '${task.description.replace(/'/g, "\\'")}')">
+                  onclick="openQuiz(${task.id}, '${task.description.replace(/'/g,"\\'")}')">
             Take Quiz
           </button>
         </div>
@@ -179,6 +185,7 @@ function renderTaskCard(task) {
     </div>
   `;
 }
+
 
 // ============================================================
 // Expand / collapse task
@@ -473,31 +480,49 @@ function hideQuizModal() {
 // Resources modal
 // ============================================================
 
-async function showResources(taskId, skillName) {
-  document.getElementById('resourcesModalTitle').textContent = `Resources — ${skillName}`;
-  document.getElementById('resourcesList').innerHTML =
-    '<div class="loading-text">Loading...</div>';
-  document.getElementById('resourcesModal').classList.remove('hidden');
+async function showResources(taskId, skillName, skillId) {
+    document.getElementById('resourcesModalTitle').textContent =
+        `Resources — ${skillName}`;
+    document.getElementById('resourcesList').innerHTML = `
+        <div class="subtask-loading">
+            <div class="spinner-sm"></div>
+            <span>Loading resources for ${skillName}...</span>
+        </div>`;
+    document.getElementById('resourcesModal').classList.remove('hidden');
 
-  try {
-    const task      = currentRoadmap.tasks.find(t => t.id === taskId);
-    const resources = task?.resources || [];
-    if (resources.length === 0) {
-      document.getElementById('resourcesList').innerHTML =
-        '<div class="loading-text">No resources found for this skill yet.</div>';
-      return;
+    try {
+        let resources = [];
+
+        // Try skill ID first if we have it
+        if (skillId) {
+            resources = await Resources.getBySkill(skillId, 6);
+        }
+
+        // Fall back to search if no skill ID or empty result
+        if (!resources || resources.length === 0) {
+            resources = await Resources.search(skillName, 5);
+        }
+
+        if (!resources || resources.length === 0) {
+            document.getElementById('resourcesList').innerHTML =
+                '<div class="loading-text">No resources found for this skill yet. Try regenerating.</div>';
+            return;
+        }
+
+        document.getElementById('resourcesList').innerHTML = resources.map(r => `
+            <a href="${r.link || '#'}" target="_blank" class="resource-card">
+                <span class="resource-type-badge">${r.type || 'ARTICLE'}</span>
+                <span class="resource-title">${r.title}</span>
+                <span class="resource-difficulty">${r.difficulty || 'BEGINNER'}</span>
+            </a>
+        `).join('');
+
+    } catch (err) {
+        document.getElementById('resourcesList').innerHTML =
+            `<div class="subtask-error">Failed to load resources: ${err.message}</div>`;
     }
-    document.getElementById('resourcesList').innerHTML = resources.map(r => `
-      <a href="${r.link || '#'}" target="_blank" class="resource-card">
-        <span class="resource-type-badge">${r.type}</span>
-        <span class="resource-title">${r.title}</span>
-        <span class="resource-difficulty">${r.difficulty}</span>
-      </a>`).join('');
-  } catch (err) {
-    document.getElementById('resourcesList').innerHTML =
-      '<div class="loading-text">Failed to load resources.</div>';
-  }
 }
+
 
 function hideResourcesModal() {
   document.getElementById('resourcesModal').classList.add('hidden');

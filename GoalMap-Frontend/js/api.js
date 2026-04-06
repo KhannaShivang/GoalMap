@@ -132,5 +132,10 @@ const Quizzes = {
 // ============================================================
 
 const Resources = {
-  getBySkill: (skillId) => apiFetch(`/resources/${skillId}`),
+    getBySkill: (skillId, limit = 6) =>
+        apiFetch(`/resources/${skillId}?limit=${limit}`),
+
+    search: (query, limit = 5) =>
+        apiFetch(`/resources/search?query=${encodeURIComponent(query)}&limit=${limit}`),
 };
+

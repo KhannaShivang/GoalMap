@@ -134,8 +134,9 @@ public class RoadmapService {
                 .priority(task.getPriority())
                 .completed(task.getCompleted())
                 .completedAt(task.getCompletedAt())
+                .skillId(task.getSkill() != null ? task.getSkill().getId() : null)
                 .skillName(task.getSkill() != null ? task.getSkill().getName() : null)
-                .resources(List.of())   // empty — fetch on demand via /api/resources/{skillId}
+                .resources(List.of())
                 .hasSubtasks(false)
                 .hasQuiz(false)
                 .totalSubtasks(0)
